@@ -1,0 +1,34 @@
+{
+  "name": "opencode-windows-shell-utf8",
+  "version": "1.0.0",
+  "description": "OpenCode v2 plugin that fixes Windows shell output encoding (PowerShell/cp1252 -> UTF-8) and strips ANSI/BOM noise from shell tool results.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./fix": "./src/fix.js"
+  },
+  "files": [
+    "index.js",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "windows",
+    "powershell",
+    "utf-8",
+    "encoding",
+    "shell"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/fix.test.js",
+    "check": "node --test test/fix.test.js"
+  }
+}
