@@ -20,6 +20,13 @@
  *      ErrorRecord decoration. This changes the consumer side only, and never
  *      rewrites non-ASCII content, so it cannot introduce mojibake.
  *
+ * This plugin deliberately does NOT touch the command text beyond the ASCII-only
+ * prefix. `scanPowerShell()` hard-rejects confusables such as U+2013-U+2015 and
+ * U+2018-U+201E in commands because PowerShell normalizes them differently than
+ * the permission scanner does; rewriting them would defeat that safety guard.
+ * Commands containing those characters keep failing exactly as they do in stock
+ * OpenCode.
+ *
  * Everything here is a pure function over the hook event. The platform is an
  * argument so the logic is testable off Windows; on non-Windows platforms the
  * plugin is a complete no-op.
@@ -36,39 +43,7 @@ export const DEFAULTS = Object.freeze({
   stripBom: true,
   /** Collapse the `At line:N char:N / + CategoryInfo / + FullyQualifiedErrorId` block. */
   compactErrors: false,
-  /**
-   * Rewrite the confusable Unicode that OpenCode's PowerShell scanner hard-rejects
-   * (`scanPowerShell` in core/src/shell/scan.ts: /[\0\u0085\u2013-\u2015\u2018-\u201e\ufeff]/)
-   * to the ASCII punctuation PowerShell would treat them as anyway. Without this,
-   * a command containing an em dash or curly quote fails with
-   * "Portable shell scanner cannot analyze command: invalid-structure".
-   */
-  normalizeConfusables: true,
 });
-
-/**
- * Characters the PowerShell scanner refuses to analyze, mapped to the ASCII
- * punctuation PowerShell normalizes them to. A valid command is strictly better
- * than a hard scanner failure; the trade-off (typographic dashes/quotes become
- * ASCII) is documented in the README and can be disabled with an option.
- */
-const CONFUSABLES = [
-  /[\u2013\u2014\u2015]/g, // en dash, em dash, horizontal bar -> hyphen
-  /[\u2018\u2019\u201a]/g, // curly single quotes -> ASCII apostrophe
-  /[\u201c\u201d\u201e]/g, // curly double quotes -> ASCII double quote
-  /[\ufeff\u0000\u0085]/g, // BOM, NUL, NEL -> removed
-];
-
-/** Make a command analyzable by OpenCode's PowerShell scanner. */
-export function normalizeConfusables(command) {
-  if (typeof command !== "string") return command;
-  return CONFUSABLES.reduce((text, pattern) => text.replace(pattern, (char) => {
-    if (char === "\u2013" || char === "\u2014" || char === "\u2015") return "-";
-    if (char === "\u2018" || char === "\u2019" || char === "\u201a") return "'";
-    if (char === "\u201c" || char === "\u201d" || char === "\u201e") return '"';
-    return ""; // \ufeff, \0, \u0085
-  }), command);
-}
 
 export function resolveOptions(raw = {}) {
   return { ...DEFAULTS, ...raw };
@@ -119,23 +94,12 @@ export function prepare(event, options = DEFAULTS, platform = process.platform) 
   const kind = shellKind(event.shell);
   let changed = false;
 
-  if (kind === "powershell") {
-    if (options.normalizeConfusables !== false) {
-      // Must happen before OpenCode's create.before hook returns: ShellTool.prepare()
-      // runs right after it and calls ShellParse.scan(), which hard-rejects these.
-      const normalized = normalizeConfusables(event.command);
-      if (normalized !== event.command) {
-        event.command = normalized;
-        changed = true;
-      }
-    }
-    if (options.powershellEncoding !== false) {
-      // A newline separator keeps here-strings and `#requires`-style commands valid,
-      // and the marker keeps the operation idempotent under repeated hooks.
-      if (!event.command.includes(MARKER)) {
-        event.command = PREFIX + event.command;
-        changed = true;
-      }
+  if (kind === "powershell" && options.powershellEncoding !== false) {
+    // A newline separator keeps here-strings and `#requires`-style commands valid,
+    // and the marker keeps the operation idempotent under repeated hooks.
+    if (!event.command.includes(MARKER)) {
+      event.command = PREFIX + event.command;
+      changed = true;
     }
   }
 

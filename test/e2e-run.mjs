@@ -18,13 +18,7 @@ import os from "node:os";
 import path from "node:path";
 
 const label = process.argv[2] ?? "fixed";
-const scenarios = {
-  confusables:
-    "Use the shell tool exactly once with this command: Write-Output 'a—b'. " +
-    "Then reply with ONLY the exact text the tool returned, no commentary.",
-};
 const prompt =
-  scenarios[process.argv[3] ?? ""] ??
   process.env.E2E_PROMPT ??
   "Use the shell tool exactly once with this command (copy it exactly): " +
     "Write-Output ([char]0x2014) ([char]0x2192) ([char]0x00E9) ([char]0x4E2D)([char]0x6587). " +

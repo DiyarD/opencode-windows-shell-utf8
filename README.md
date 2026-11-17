@@ -23,7 +23,7 @@ Two further Windows-specific issues:
   if (/[\0\u0085\u2013-\u2015\u2018-\u201e\ufeff]/.test(input))
     return { kind: "opaque", reason: "invalid-structure" }
   ```
-  So a command containing an em dash or curly quote fails with `Portable shell scanner cannot analyze command: invalid-structure` before it ever runs.
+  So a command containing an em dash or curly quote fails with `Portable shell scanner cannot analyze command: invalid-structure` before it ever runs. **This is a deliberate safety guard, and this plugin intentionally leaves it alone** — PowerShell normalizes those characters differently than the permission scanner does, so rewriting them could defeat permission analysis.
 
 ## What this plugin does
 
@@ -34,8 +34,7 @@ Two further Windows-specific issues:
    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
    ```
-2. Rewrites the scanner-rejected confusables to the ASCII punctuation PowerShell normalizes them to (`—`/`–` → `-`, curly quotes → `'` / `"`, BOM/NUL/NEL removed). A command that previously failed now runs.
-3. Sets `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8` **only when the agent has not already set them**.
+2. Sets `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8` **only when the agent has not already set them**.
 
 `tool` → `execute.after` (shell/bash results only):
 
@@ -65,7 +64,6 @@ Pass options with the object form in `opencode.json(c)`:
 |---|---|---|
 | `powershellEncoding` | `true` | Add the UTF-8 output header to PowerShell commands |
 | `pythonEnv` | `true` | Set `PYTHONUTF8` / `PYTHONIOENCODING` when unset |
-| `normalizeConfusables` | `true` | Rewrite scanner-rejected typographic characters to ASCII |
 | `stripAnsi` | `true` | Strip ANSI color/control sequences from shell results |
 | `stripBom` | `true` | Strip a leading BOM from shell results |
 | `compactErrors` | `false` | Collapse PowerShell ErrorRecord decoration |
@@ -90,11 +88,10 @@ End-to-end headless sessions (`test/e2e-run.mjs`, private server) confirmed the 
 - **without** plugin: `"output":"-\r\n\u001a\r\n\ufffd\r\n?\r\n?\r\n"`
 - **with** plugin: `"output":"—\r\n→\r\né\r\n中\r\n文\r\n"`
 - regression, normal command: `"output":"alpha\r\nbeta\r\n"`, `exit: 0`
-- previously rejected `Write-Output 'a—b'`: now `"output":"a-b\r\n"`, `exit: 0`
 
 ## Caveats
 
-- `normalizeConfusables` changes typographic dashes/quotes to ASCII in commands. That is the price of turning a hard scanner failure into a working command; disable it if you need the exact glyphs (and use `[char]0x2014` style escapes instead).
+- The plugin does **not** bypass OpenCode's PowerShell scanner guard. Commands containing em/en dashes, curly quotes, BOM, NUL or NEL still fail with `invalid-structure` exactly as in stock OpenCode. That guard exists for permission-analysis safety; use ASCII or `[char]0x2014`-style escapes in commands instead.
 - The plugin does not change how `Get-Content` decodes files in PowerShell 5.1 (`-Encoding UTF8` is still needed for UTF-8 files), nor does it wrap native stderr in CLIXML-free form. Those are separate scanner/runtime concerns.
 - Built for the OpenCode v2 plugin API (`Plugin.define` + `ctx.shell.hook` + `ctx.tool.hook`). Verify compatibility when upgrading OpenCode.
 

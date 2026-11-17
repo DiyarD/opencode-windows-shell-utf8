@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import {
   DEFAULTS,
   compactPowerShellErrors,
-  normalizeConfusables,
   prepare,
   resolveOptions,
   sanitizeResult,
@@ -89,26 +88,12 @@ test("prepare options can disable each behaviour", () => {
   assert.deepEqual(e.env, {});
 });
 
-test("normalizeConfusables maps the scanner-rejected characters to ASCII", () => {
-  const rejected = "Write-Output 'a—b–c “q” ‘s’ \ufeff'";
-  const clean = normalizeConfusables(rejected);
-  assert.equal(clean, 'Write-Output \'a-b-c "q" \'s\' \'');
-  assert.ok(!/[\0\u0085\u2013-\u2015\u2018-\u201e\ufeff]/.test(clean), "scanner guard must pass");
-  assert.equal(normalizeConfusables("plain ascii"), "plain ascii");
-  assert.equal(normalizeConfusables(undefined), undefined);
-});
-
-test("prepare normalizes confusables before the scanner sees a PowerShell command", () => {
-  const e = event(PS, "Write-Output 'a—b'");
+test("prepare leaves scanner-rejected confusables untouched (safety guard is not bypassed)", () => {
+  const original = "Write-Output 'a—b'";
+  const e = event(PS, original, { PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" });
   prepare(e, DEFAULTS, "win32");
-  assert.ok(e.command.includes("Write-Output 'a-b'"));
-  assert.ok(!e.command.includes("—"));
-});
-
-test("normalizeConfusables can be disabled by option", () => {
-  const e = event(PS, "Write-Output 'a—b'");
-  prepare(e, resolveOptions({ normalizeConfusables: false, powershellEncoding: false, pythonEnv: false }), "win32");
-  assert.ok(e.command.includes("—"));
+  assert.ok(e.command.includes(original), "the em dash must survive unchanged");
+  assert.ok(/[\u2013\u2014\u2015]/.test(e.command), "scanPowerShell must still reject this command");
 });
 
 test("sanitizeText strips ANSI CSI and OSC sequences but keeps Unicode", () => {
