@@ -2,6 +2,8 @@
 
 A small OpenCode **v2** plugin that fixes the Windows shell tool's encoding and PowerShell-quirk problems. No source patching: it uses two documented plugin hooks.
 
+Install: add `"github:DiyarD/opencode-windows-shell-utf8"` to `plugins` in your global `opencode.json(c)`.
+
 Tested against **OpenCode v2.3.0** on Windows with Windows PowerShell 5.1 (`powershell.exe`), the default compatible shell when `pwsh` is absent.
 
 ## The problem (v2.3.0 source)
@@ -52,7 +54,7 @@ Pass options with the object form in `opencode.json(c)`:
 {
   "plugins": [
     {
-      "package": "file:///C:/dev/oc-fix-windows-shell",
+      "package": "github:DiyarD/opencode-windows-shell-utf8",
       "options": {
         "compactErrors": true
       }
