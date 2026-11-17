@@ -37,6 +37,8 @@ export const DEFAULTS = Object.freeze({
   powershellEncoding: true,
   /** Set PYTHONUTF8 / PYTHONIOENCODING when the agent has not set them. */
   pythonEnv: true,
+  /** Make PowerShell's Set-Content / Out-File / Add-Content / > write UTF-8 by default. */
+  psUtf8Files: true,
   /** Strip ANSI CSI/OSC escape sequences from shell tool text. */
   stripAnsi: true,
   /** Strip a leading UTF-8 BOM from shell tool text. */
@@ -68,8 +70,20 @@ const UTF8_LINES = [
   "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
   "$OutputEncoding = [System.Text.UTF8Encoding]::new($false)",
 ];
-const PREFIX = `${UTF8_LINES.join("\n")}\n`;
+// PS 5.1 defaults Set-Content/Out-File to cp1252 and `>` to UTF-16LE. These
+// defaults make all four write UTF-8; a command can still pass -Encoding explicitly.
+const FILE_ENCODING_LINES = [
+  "$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'",
+  "$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'",
+  "$PSDefaultParameterValues['Add-Content:Encoding'] = 'utf8'",
+];
 const MARKER = UTF8_LINES[0];
+
+function buildPrefix(options) {
+  const lines = [...UTF8_LINES];
+  if (options.psUtf8Files !== false) lines.push(...FILE_ENCODING_LINES);
+  return `${lines.join("\n")}\n`;
+}
 
 function setDefaultEnv(env, key, value) {
   if (!env) return false;
@@ -98,7 +112,7 @@ export function prepare(event, options = DEFAULTS, platform = process.platform) 
     // A newline separator keeps here-strings and `#requires`-style commands valid,
     // and the marker keeps the operation idempotent under repeated hooks.
     if (!event.command.includes(MARKER)) {
-      event.command = PREFIX + event.command;
+      event.command = buildPrefix(options) + event.command;
       changed = true;
     }
   }

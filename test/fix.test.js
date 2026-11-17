@@ -45,7 +45,17 @@ test("prepare prefixes a PowerShell command with a UTF-8 setup header", () => {
   assert.equal(r.changed, true);
   assert.ok(e.command.startsWith("[Console]::OutputEncoding ="));
   assert.ok(e.command.includes("$OutputEncoding ="));
+  assert.ok(e.command.includes("$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8'"));
+  assert.ok(e.command.includes("$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'"));
+  assert.ok(e.command.includes("$PSDefaultParameterValues['Add-Content:Encoding'] = 'utf8'"));
   assert.ok(e.command.endsWith("\nGet-Content notes.md"));
+});
+
+test("psUtf8Files option can disable the file-encoding defaults", () => {
+  const e = event(PS, "Get-Content notes.md", { PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" });
+  prepare(e, resolveOptions({ psUtf8Files: false }), "win32");
+  assert.ok(e.command.includes("[Console]::OutputEncoding ="));
+  assert.ok(!e.command.includes("PSDefaultParameterValues"));
 });
 
 test("prepare is idempotent: repeated calls never double-prefix", () => {

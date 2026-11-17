@@ -35,6 +35,7 @@ Two further Windows-specific issues:
    $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
    ```
 2. Sets `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8` **only when the agent has not already set them**.
+3. Sets PowerShell's file defaults so `Set-Content`, `Out-File`, `Add-Content` and `>` write UTF-8. A command can still pass `-Encoding` explicitly.
 
 `tool` → `execute.after` (shell/bash results only):
 
@@ -64,6 +65,7 @@ Pass options with the object form in `opencode.json(c)`:
 |---|---|---|
 | `powershellEncoding` | `true` | Add the UTF-8 output header to PowerShell commands |
 | `pythonEnv` | `true` | Set `PYTHONUTF8` / `PYTHONIOENCODING` when unset |
+| `psUtf8Files` | `true` | Make PowerShell file writes UTF-8 by default |
 | `stripAnsi` | `true` | Strip ANSI color/control sequences from shell results |
 | `stripBom` | `true` | Strip a leading BOM from shell results |
 | `compactErrors` | `false` | Collapse PowerShell ErrorRecord decoration |
@@ -74,6 +76,7 @@ Pass options with the object form in `opencode.json(c)`:
 ```bat
 npm test                 :: 16 unit tests (platform-independent)
 node test/live-probe.mjs :: real powershell.exe byte-level A/B
+node test/file-write-probe.mjs :: file-write encoding check (all 5 paths clean)
 ```
 
 Measured byte-level A/B for `Write-Output ([char]0x2014) ([char]0x2192) ([char]0x00E9) ([char]0x4E2D)([char]0x6587)`:
@@ -92,7 +95,8 @@ End-to-end headless sessions (`test/e2e-run.mjs`, private server) confirmed the 
 ## Caveats
 
 - The plugin does **not** bypass OpenCode's PowerShell scanner guard. Commands containing em/en dashes, curly quotes, BOM, NUL or NEL still fail with `invalid-structure` exactly as in stock OpenCode. That guard exists for permission-analysis safety; use ASCII or `[char]0x2014`-style escapes in commands instead.
-- The plugin does not change how `Get-Content` decodes files in PowerShell 5.1 (`-Encoding UTF8` is still needed for UTF-8 files), nor does it wrap native stderr in CLIXML-free form. Those are separate scanner/runtime concerns.
+- File **writing** is now UTF-8 by default. File **reading** with `Get-Content` in PowerShell 5.1 still defaults to ANSI, so use `-Encoding UTF8` for UTF-8 files. `write`/`edit` tools are unaffected.
+- A command that deliberately needs UTF-16 or ANSI must pass `-Encoding` explicitly. Set `psUtf8Files: false` to turn the file defaults off.
 - Built for the OpenCode v2 plugin API (`Plugin.define` + `ctx.shell.hook` + `ctx.tool.hook`). Verify compatibility when upgrading OpenCode.
 
 ## License
