@@ -39,10 +39,7 @@ Two further Windows-specific issues:
 2. Sets `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8` **only when the agent has not already set them**.
 3. Sets PowerShell's file defaults so `Set-Content`, `Out-File`, `Add-Content` and `>` write UTF-8. A command can still pass `-Encoding` explicitly.
 
-`tool` → `execute.after` (shell/bash results only):
-
-4. Strips ANSI CSI/OSC escape codes and a leading BOM from the agent-visible text. This is consumer-side only; it never rewrites non-ASCII content, so it cannot introduce mojibake.
-5. Optionally compacts PowerShell's `At line:N char:N / + CategoryInfo / + FullyQualifiedErrorId` decoration (`compactErrors`, default **false**).
+Tool output is never modified, stripped, or hidden.
 
 On non-Windows platforms the plugin is a complete no-op. `cmd.exe` and bash commands are not rewritten; only their Python env defaults are set.
 
@@ -56,7 +53,7 @@ Pass options with the object form in `opencode.json(c)`:
     {
       "package": "github:DiyarD/opencode-windows-shell-utf8",
       "options": {
-        "compactErrors": true
+        "psUtf8Files": false
       }
     }
   ]
@@ -68,9 +65,6 @@ Pass options with the object form in `opencode.json(c)`:
 | `powershellEncoding` | `true` | Add the UTF-8 output header to PowerShell commands |
 | `pythonEnv` | `true` | Set `PYTHONUTF8` / `PYTHONIOENCODING` when unset |
 | `psUtf8Files` | `true` | Make PowerShell file writes UTF-8 by default |
-| `stripAnsi` | `true` | Strip ANSI color/control sequences from shell results |
-| `stripBom` | `true` | Strip a leading BOM from shell results |
-| `compactErrors` | `false` | Collapse PowerShell ErrorRecord decoration |
 | `log` | `false` | Log a line when the plugin loads |
 
 ## Verification

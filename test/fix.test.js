@@ -3,11 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULTS,
-  compactPowerShellErrors,
   prepare,
   resolveOptions,
-  sanitizeResult,
-  sanitizeText,
   shellBase,
   shellKind,
 } from "../src/fix.js";
@@ -106,56 +103,3 @@ test("prepare leaves scanner-rejected confusables untouched (safety guard is not
   assert.ok(/[\u2013\u2014\u2015]/.test(e.command), "scanPowerShell must still reject this command");
 });
 
-test("sanitizeText strips ANSI CSI and OSC sequences but keeps Unicode", () => {
-  const dirty = "\u001b[32m✓ built\u001b[0m — café \u001b]8;;http://x\u0007link\u001b]8;;\u0007";
-  const clean = sanitizeText(dirty, DEFAULTS);
-  assert.equal(clean, "✓ built — café link");
-});
-
-test("sanitizeText strips a leading BOM without touching other text", () => {
-  assert.equal(sanitizeText("\ufeff\n\"\"\"docstring\"\"\""), "\n\"\"\"docstring\"\"\"");
-  assert.equal(sanitizeText("already clean"), "already clean");
-});
-
-test("sanitizeText only compacts real PowerShell error records when enabled", () => {
-  const err =
-    "python : Traceback (most recent call last)\r\n" +
-    "At line:1 char:1\r\n" +
-    "+ python -c \"...\" 2>&1 | ...\r\n" +
-    "+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n" +
-    "    + CategoryInfo          : NotSpecified: (...) [], RemoteException\r\n" +
-    "    + FullyQualifiedErrorId : NativeCommandError\r\n";
-
-  assert.equal(sanitizeText(err, DEFAULTS), err, "compaction is opt-in");
-  const compacted = sanitizeText(err, resolveOptions({ compactErrors: true }));
-  assert.ok(compacted.includes("python : Traceback"));
-  assert.ok(compacted.includes("+ python -c"));
-  assert.ok(!compacted.includes("At line:1"));
-  assert.ok(!compacted.includes("CategoryInfo"));
-  assert.ok(!compacted.includes("FullyQualifiedErrorId"));
-  assert.ok(!compacted.includes("~~~~"));
-
-  // A normal diff must never be compacted.
-  const diff = "--- a\n+++ b\n+ added line\n+ another\n";
-  assert.equal(sanitizeText(diff, resolveOptions({ compactErrors: true })), diff);
-});
-
-test("sanitizeResult mutates only text content items and reports changes", () => {
-  const result = {
-    content: [
-      { type: "text", text: "\u001b[31mred\u001b[0m — ok" },
-      { type: "text", text: "clean" },
-      { type: "image", data: "..." },
-    ],
-  };
-  assert.equal(sanitizeResult(result, DEFAULTS), true);
-  assert.equal(result.content[0].text, "red — ok");
-  assert.equal(result.content[1].text, "clean");
-  assert.deepEqual(result.content[2], { type: "image", data: "..." });
-  assert.equal(sanitizeResult(result, DEFAULTS), false, "second pass is a no-op");
-});
-
-test("sanitizeResult tolerates malformed results", () => {
-  assert.equal(sanitizeResult(undefined), false);
-  assert.equal(sanitizeResult({ content: null }), false);
-});
